@@ -1,0 +1,9 @@
+.DS_Store
+.ropeproject
+*.pyc
+tags
+*.swp
+*.sqlite
+tags
+upload/
+client_secrets.json
