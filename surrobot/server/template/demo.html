@@ -1,0 +1,56 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>Email Autoreply</title>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+
+        <style>
+        div.container {
+		  width: 500px;
+		  margin-left: auto;
+		  margin-right: auto;
+		}
+		 
+        </style>
+    </head>
+    
+    <body>
+    	<div class="container">
+			<div style="width: 94%; display: inline-block;">
+				Inquiry Email: 
+				<br>
+				<textarea id='inquiry' value="" style="height: 100px; width: 60%;"></textarea>
+				<br>
+				<button type="button" onclick="autoreply();">Search</button>
+			</div>
+			<hr>
+
+			<div>
+			Autoreply:
+				<ul id="autoreply">
+
+				</ul>
+			</div>
+
+			<ul id="recents-container" class="recents-container">
+			</ul>
+		</div>
+		<script>
+    	function autoreply() {
+    		var inquiry = $('#inquiry').val();
+    		console.log('inquiry', inquiry);
+    		$.post('/autoreply', {
+    			'mail_body': JSON.stringify(inquiry),
+    			'top_k': '3'
+    		}, function(data) {
+    			$('#autoreply').html('');
+    			for(var resp of JSON.parse(data)) {
+    				$('#autoreply').html($('#autoreply').html() + '<li> ' + '<b>score: ' + resp[1] 
+    					+ '</b> <br>' + resp[0] + '</li><br>');
+    			}
+    		});
+    	}
+    	</script>
+    </body>
+</html>
