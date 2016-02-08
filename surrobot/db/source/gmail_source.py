@@ -1,6 +1,7 @@
 # extract emails from Gmail source
 import gmail
 from oauth2client import client as auth_client
+from sys import stderr
 
 from surrobot.config import GOOGLE_CLIENT_SECRET, GOOGLE_DB_FILE_NAME
 from surrobot.db.db import sql, DBConn
@@ -88,6 +89,7 @@ def extract(email_addr, access_token, domain='inbox'):
     client = gmail.authenticate(email_addr, access_token)
     return getattr(client, domain)().mail()
 
+
 def access_token(secrets_json_path='client_secrets.json'):
     flow = auth_client.flow_from_clientsecrets(
         'client_secrets.json',
@@ -104,3 +106,34 @@ def access_token(secrets_json_path='client_secrets.json'):
     token = access_token_info.access_token
     return token
 
+
+def sync(email_addr):
+    try:
+        from surrobot.db.source.gmail_source import extract, access_token, AccessToken
+        messages = extract(
+                email_addr=email_addr,
+                access_token=AccessToken.get(email_addr),
+                domain='all_mail')
+
+        def fetch_messages():
+            for (mi, message) in enumerate(messages):
+                if mi <= 24998:
+                    print '[%d] skip' % mi
+                    continue
+                try:
+                    message.fetch()
+                    print '[%d]' % mi, message.subject
+                    yield message
+                except Exception as e:
+                    print>>stderr, '[error in fetch]', e.message
+
+
+        EmailDB.update_all(email_addr, fetch_messages())
+
+    except ImportError as e:
+        print>>stderr, 'sync: cannot sync with gmail'
+        print>>stderr, e.message
+
+
+if __name__ == '__main__':
+    sync('stl501@gmail.com')
