@@ -5,8 +5,11 @@ import numpy as np
 WORD2VEC_MODEL = None
 def init_word2vec():
     global WORD2VEC_MODEL
-    from gensim.models import Word2Vec
-    WORD2VEC_MODEL = Word2Vec.load_word2vec_format('model/GoogleNews-vectors-negative300.bin', binary=True)
+    if not WORD2VEC_MODEL:
+        print 'loading word2vec model'
+        from gensim.models import Word2Vec
+        WORD2VEC_MODEL = Word2Vec.load_word2vec_format('model/GoogleNews-vectors-negative300.bin', binary=True)
+        print 'loading word2vec model [done]'
 
 def avg_word_vec(doc):
     vec = np.zeros_like(WORD2VEC_MODEL['hello'])
