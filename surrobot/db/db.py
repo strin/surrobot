@@ -1,9 +1,9 @@
 # shared database utils.
 import sqlite3 as sql
 import simplejson as json
+import sys
 
 from surrobot.config import EMAIL_DB_FILE_NAME
-from surrobot.db.db import sql, DBConn
 
 
 class DBConn(object):
@@ -13,12 +13,14 @@ class DBConn(object):
     def __exit__(self, type, value, traceback):
         raise NotImplementedError()
 
+
 class Email(object):
-    def __init__(self, email_addr, message_id, thread_id, sent_at, headers, body):
+    def __init__(self, email_addr, message_id, thread_id, sent_at, subject, headers, body):
         self.email_addr = email_addr
         self.message_id = message_id
         self.thread_id = thread_id
         self.sent_at = sent_at
+        self.subject = subject
         self.headers = headers
         self.body = body
 
@@ -27,11 +29,22 @@ class Email(object):
 
 
 class EmailDBConn(DBConn):
+    def __init__(self, db=EMAIL_DB_FILE_NAME):
+        self.db = db
+
     def __enter__(self):
-        conn = sql.connect(EMAIL_DB_FILE_NAME)
+        conn = sql.connect(self.db)
         conn.row_factory = sql.Row
         # manages access tokens for user's email account.
-        conn.execute("""CREATE TABLE IF NOT EXISTS email
+        conn.execute("""CREATE TABLE IF NOT EXISTS outbox
+                    (email text,
+                    message_id text,
+                    thread_id text,
+                    date text,
+                    header text,
+                    subject text,
+                    body text)""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS inbox
                     (email text,
                     message_id text,
                     thread_id text,
@@ -52,9 +65,13 @@ class EmailDB(object):
     '''
     manages the interface with db to save emails.
     '''
-    @staticmethod
-    def update_all(email_addr, emails):
-        with EmailDBConn() as conn:
+    def __init__(self, table, db=EMAIL_DB_FILE_NAME):
+        self.db = db
+        self.table = table
+
+
+    def update_all(self, email_addr, emails):
+        with EmailDBConn(self.db) as conn:
             cursor = conn.cursor()
             for email in emails:
                 try:
@@ -74,9 +91,9 @@ class EmailDB(object):
                     # print email_data
                     email_data = {key: unicode(val) for (key, val) in email_data.items()}
                     # update database.
-                    if EmailDB.get_message(email_addr, email.message_id):
+                    if self.get_message(email_addr, email.message_id):
                         cursor.execute('''
-                                UPDATE email
+                                UPDATE %s
                                 SET
                                     thread_id=:thread_id,
                                     date=:date,
@@ -84,28 +101,27 @@ class EmailDB(object):
                                     subject=:subject,
                                     body=:body
                                 WHERE message_id=:message_id
-                                AND email=:email_addr''', email_data)
+                                AND email=:email_addr''' % self.table, email_data)
                     else:
                         cursor.execute('''
-                                INSERT INTO email
+                                INSERT INTO %s
                                 (email, message_id,
                                 thread_id, date, header, subject, body)
                                 VALUES
                                 (:email_addr, :message_id,
                                 :thread_id, :date, :header, :subject, :body
-                                )''', email_data)
+                                )''' % self.table, email_data)
                     conn.commit()
                 except Exception as e:
-                    print>>stderr, '[error in store]', e.message
+                    print>>sys.stderr, '[error in store]', e.message
 
 
-    @staticmethod
-    def get_message(email_addr, message_id):
-        with EmailDBConn() as conn:
+    def get_message(self, email_addr, message_id):
+        with EmailDBConn(self.db) as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                    SELECT * FROM email WHERE email=:email AND message_id=:message_id
-                    ''', dict(email=email_addr, message_id=message_id))
+                    SELECT * FROM %s WHERE email=:email AND message_id=:message_id
+                    ''' % self.table, dict(email=email_addr, message_id=message_id))
             row = cursor.fetchone()
             if row:
                 return {
@@ -114,5 +130,21 @@ class EmailDB(object):
             else:
                 return None
 
-    def enumerate(email_addr):
-        pass
+    def select(self, where='', data={}):
+        if where:
+            where = 'WHERE ' + where
+        with EmailDBConn(self.db) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''SELECT * from %s %s'''
+                    % (self.table, where), data)
+            rows = cursor.fetchall()
+            for row in rows:
+                if row:
+                    yield Email(email_addr=row['email'],
+                                message_id=row['message_id'],
+                                thread_id=row['thread_id'],
+                                sent_at=row['date'],
+                                subject=row['subject'],
+                                headers=row['header'],
+                                body=row['body']
+                            )

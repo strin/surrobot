@@ -109,7 +109,6 @@ def access_token(secrets_json_path='client_secrets.json'):
 
 def sync(email_addr):
     try:
-        from surrobot.db.source.gmail_source import extract, access_token, AccessToken
         messages = extract(
                 email_addr=email_addr,
                 access_token=AccessToken.get(email_addr),
