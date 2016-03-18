@@ -46,8 +46,8 @@
     		}, function(data) {
     			$('#autoreply').html('');
     			for(var resp of JSON.parse(data)) {
-    				$('#autoreply').html($('#autoreply').html() + '<li> ' + '<b>score: ' + resp[1] 
-    					+ '</b> <br>' + resp[0] + '</li><br>');
+    				$('#autoreply').html($('#autoreply').html() + '<li>' + resp[0]  + '<br><small>score: ' + resp[1] 
+                        + '</small>' + '</li><br>');
     			}
     		});
     	}

@@ -2,6 +2,7 @@
 # extract email from csv conversation format
 # header: id	email_id	thread_id	date	original_email	normalised_email	email_words	response_subject	response_email	created_at	updated_at	user_id	user_email_id
 import csv
+import sys
 
 from surrobot.db.db import Email, EmailDB
 
@@ -13,7 +14,9 @@ def extract(csv_path):
     ======
     list of pairs (in_mail, out_mail)
     '''
-    sanitize_text = lambda body: body.decode('unicode_escape').encode('ascii', 'ignore') # TODO: support unicode.
+    def sanitize_text (body):
+        body = ''.join([i if ord(i) < 128 else ' ' for i in body])
+        return body
 
     with open(csv_path, 'rU') as f:
         reader = csv.DictReader(f)
@@ -26,7 +29,7 @@ def extract(csv_path):
                         thread_id=row['thread_id'],
                         subject='',
                         headers='',
-                        body=sanitize_text(row['normalised_email'])
+                        body=sanitize_text(row['original_email'])
                     )
             # create response mail
             out_mail = Email(
@@ -65,6 +68,9 @@ def sync(csv_path):
     outbox_db.update_all('csv@evolutics.com', get_out_mail())
 
 if __name__ == '__main__':
-    sync('data/conversations.csv')
+    if len(sys.argv) > 1:
+        sync(sys.argv[1])
+    else:
+        sync('data/conversations.csv')
 
 
